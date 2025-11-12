@@ -105,6 +105,36 @@ class UserRepository {
             Result.failure(e)
         } catch (e: Exception) {
             Result.failure(e)
+        }}
+    data class OnlineUser(
+            val uid: String,
+            val lat: Double,
+            val lng: Double,
+            val photoUrl: String?
+        )
+
+        fun flowOnlineUsers(limit: Int = 100): Flow<List<OnlineUser>> = callbackFlow {
+            val query = usersRef.orderByChild("online").equalTo(true)
+            val listener = object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val list = snapshot.children
+                        .take(limit)
+                        .mapNotNull { user ->
+                            val uid = user.key ?: return@mapNotNull null
+                            val lat = user.child("lat").getValue(Double::class.java)
+                            val lng = user.child("lng").getValue(Double::class.java)
+                            val photo = user.child("photoUrl").getValue(String::class.java)
+                            if (lat != null && lng != null) OnlineUser(uid, lat, lng, photo) else null
+                        }
+                    trySend(list)
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    close(error.toException())
+                }
+            }
+            query.addValueEventListener(listener)
+            awaitClose { query.removeEventListener(listener) }
         }
     }
-}
+
