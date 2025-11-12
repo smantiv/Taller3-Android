@@ -16,11 +16,45 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.Date
 
 class UserRepository {
 
     private val db: FirebaseDatabase = FirebaseDatabase.getInstance("https://taller3-70cb1-default-rtdb.firebaseio.com")
     private val usersRef = db.getReference("users")
+    private val tracksRef = db.getReference("tracks")
+
+
+    data class OnlineUser(
+        val uid: String,
+        val lat: Double,
+        val lng: Double,
+        val photoUrl: String?
+    )
+
+    fun flowOnlineUsers(limit: Int = 100): Flow<List<OnlineUser>> = callbackFlow {
+        val query = usersRef.orderByChild("online").equalTo(true)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val list = snapshot.children
+                    .take(limit)
+                    .mapNotNull { user ->
+                        val uid = user.key ?: return@mapNotNull null
+                        val lat = user.child("lat").getValue(Double::class.java)
+                        val lng = user.child("lng").getValue(Double::class.java)
+                        val photo = user.child("photoUrl").getValue(String::class.java)
+                        if (lat != null && lng != null) OnlineUser(uid, lat, lng, photo) else null
+                    }
+                trySend(list)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        query.addValueEventListener(listener)
+        awaitClose { query.removeEventListener(listener) }
+    }
 
     fun flowOnline(uid: String): Flow<Boolean> = callbackFlow {
         val onlineRef = usersRef.child(uid).child("online")
@@ -86,6 +120,18 @@ class UserRepository {
         }
     }
 
+    suspend fun appendTrackPoint(uid: String, latLng: LatLng): Result<Unit> {
+        return try {
+            val timestamp = Date().time
+            val pointData = mapOf("lat" to latLng.latitude, "lng" to latLng.longitude)
+            tracksRef.child(uid).child(timestamp.toString()).setValue(pointData).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
     @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(context: Context): Result<Location> {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -105,36 +151,6 @@ class UserRepository {
             Result.failure(e)
         } catch (e: Exception) {
             Result.failure(e)
-        }}
-    data class OnlineUser(
-            val uid: String,
-            val lat: Double,
-            val lng: Double,
-            val photoUrl: String?
-        )
-
-        fun flowOnlineUsers(limit: Int = 100): Flow<List<OnlineUser>> = callbackFlow {
-            val query = usersRef.orderByChild("online").equalTo(true)
-            val listener = object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val list = snapshot.children
-                        .take(limit)
-                        .mapNotNull { user ->
-                            val uid = user.key ?: return@mapNotNull null
-                            val lat = user.child("lat").getValue(Double::class.java)
-                            val lng = user.child("lng").getValue(Double::class.java)
-                            val photo = user.child("photoUrl").getValue(String::class.java)
-                            if (lat != null && lng != null) OnlineUser(uid, lat, lng, photo) else null
-                        }
-                    trySend(list)
-                }
-
-                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                    close(error.toException())
-                }
-            }
-            query.addValueEventListener(listener)
-            awaitClose { query.removeEventListener(listener) }
         }
     }
-
+}

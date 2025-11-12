@@ -40,13 +40,14 @@ import com.example.taller3.navigation.Screen
 import com.example.taller3.viewmodel.AuthViewModel
 import com.example.taller3.viewmodel.HomeViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,10 +64,12 @@ fun HomeScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val defaultLatLng = LatLng(37.4219999, -122.0840575) // Googleplex
+    val defaultLatLng = LatLng(37.4219999, -122.0840575)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultLatLng, 14f)
     }
+
+    var hasCenteredOnFirstFix by remember { mutableStateOf(false) }
 
     fun hasLocationPermission(): Boolean {
         val fine = ContextCompat.checkSelfPermission(
@@ -84,9 +87,25 @@ fun HomeScreen(
         val granted = (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) ||
                 (result[Manifest.permission.ACCESS_COARSE_LOCATION] == true)
         if (granted) {
-            homeViewModel.enableOnlineAndSaveOneShotLocation(context)
+            homeViewModel.enableOnlineAndStartUpdates(context)
         } else {
             homeViewModel.setOnline(false)
+        }
+    }
+
+    LaunchedEffect(uiState.isOnline) {
+        if (!uiState.isOnline) {
+            hasCenteredOnFirstFix = false
+        }
+    }
+
+    val currentLatLng = uiState.currentLatLng
+    LaunchedEffect(currentLatLng) {
+        if (uiState.isOnline && currentLatLng != null && !hasCenteredOnFirstFix) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(currentLatLng, 16f)
+            )
+            hasCenteredOnFirstFix = true
         }
     }
 
@@ -94,14 +113,6 @@ fun HomeScreen(
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
             homeViewModel.clearError()
-        }
-    }
-
-    LaunchedEffect(uiState.currentLatLng) {
-        uiState.currentLatLng?.let {
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(it, 16f)
-            )
         }
     }
 
@@ -123,7 +134,7 @@ fun HomeScreen(
                                 Log.d("SwitchClick", "checked=$checked")
                                 if (checked) {
                                     if (hasLocationPermission()) {
-                                        homeViewModel.enableOnlineAndSaveOneShotLocation(context)
+                                        homeViewModel.enableOnlineAndStartUpdates(context)
                                     } else {
                                         launcher.launch(
                                             arrayOf(
@@ -154,47 +165,54 @@ fun HomeScreen(
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier
-            .padding(innerPadding)
-            .fillMaxSize()
+        Box(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
         ) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 properties = MapProperties(isMyLocationEnabled = false)
             ) {
-                // ====== 1) Marcador del USUARIO ACTUAL (con foto si está disponible) ======
-                uiState.currentLatLng?.let { myPos ->
-                    val myUid = authViewModel.getCurrentUser()?.uid
-                    // Busca tu entrada (si estás online y el repo la expone)
-                    val meOnlineEntry = onlineUsers.firstOrNull { it.uid == myUid }
-                    var myIcon: BitmapDescriptor? by remember(myUid, meOnlineEntry?.photoUrl) {
-                        mutableStateOf(null)
-                    }
+                val myUid = authViewModel.getCurrentUser()?.uid
 
-                    LaunchedEffect(myUid, meOnlineEntry?.photoUrl) {
-                        if (myUid != null) {
-                            myIcon = homeViewModel.getUserMarkerDescriptor(
-                                context = context,
-                                uid = myUid,
-                                photoUrl = meOnlineEntry?.photoUrl
-                            )
-                        } else {
-                            myIcon = null
+                if (uiState.isOnline) {
+                    // mi marcador
+                    uiState.currentLatLng?.let { myPos ->
+                        val meOnlineEntry = onlineUsers.firstOrNull { it.uid == myUid }
+                        var myIcon: BitmapDescriptor? by remember(myUid, meOnlineEntry?.photoUrl) {
+                            mutableStateOf(null)
                         }
+                        LaunchedEffect(myUid, meOnlineEntry?.photoUrl) {
+                            if (myUid != null) {
+                                myIcon = homeViewModel.getUserMarkerDescriptor(
+                                    context = context,
+                                    uid = myUid,
+                                    photoUrl = meOnlineEntry?.photoUrl
+                                )
+                            } else {
+                                myIcon = null
+                            }
+                        }
+                        Marker(
+                            state = remember(myPos) { MarkerState(position = myPos) },
+                            title = "Tú",
+                            icon = myIcon
+                        )
                     }
 
-                    Marker(
-                        state = MarkerState(position = myPos),
-                        title = "Tú",
-                        icon = myIcon // si es null, usa default; cuando cargue, se actualiza
-                    )
+                    // mi recorrido
+                    if (uiState.path.size >= 2) {
+                        Polyline(
+                            points = uiState.path
+                        )
+                    }
                 }
 
-                // ====== 2) Marcadores de OTROS usuarios online (con su foto) ======
-                val myUid = authViewModel.getCurrentUser()?.uid
-                onlineUsers.forEach { u ->
-                    if (u.uid != null && u.uid != myUid) {
+                // los marcadores de los demas
+                for (u in onlineUsers) {
+                    if (u.uid != myUid) {
                         val pos = LatLng(u.lat, u.lng)
                         var icon: BitmapDescriptor? by remember(u.uid, u.photoUrl) {
                             mutableStateOf(null)
@@ -207,9 +225,9 @@ fun HomeScreen(
                             )
                         }
                         Marker(
-                            state = MarkerState(position = pos),
+                            state = remember(u.uid, pos) { MarkerState(position = pos) },
                             title = u.uid,
-                            icon = icon // cuando cargue, se actualiza al ícono circular
+                            icon = icon
                         )
                     }
                 }

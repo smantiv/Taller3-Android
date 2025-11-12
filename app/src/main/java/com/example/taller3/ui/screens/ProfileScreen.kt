@@ -70,7 +70,6 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Lanzador para elegir imagen desde la galería
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -122,7 +121,6 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                // ======= FOTO DE PERFIL (tocar para cambiar) =======
                 Box(
                     modifier = Modifier
                         .size(120.dp)
@@ -143,7 +141,6 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Placeholder simple con ícono
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Sin foto",
@@ -162,7 +159,14 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
 
                 Spacer(Modifier.height(20.dp))
 
-                // ======= CAMPOS DE PERFIL =======
+                OutlinedTextField(
+                    value = profile?.email ?: "",
+                    onValueChange = {},
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -190,7 +194,7 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
 
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = { profileViewModel.onRemovePhoto() }, // requiere método en el VM
+                    onClick = { profileViewModel.onRemovePhoto() },
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -199,7 +203,6 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
 
                 Spacer(Modifier.height(24.dp))
 
-                // ======= CAMBIAR CONTRASEÑA =======
                 Text("Cambiar Contraseña", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(

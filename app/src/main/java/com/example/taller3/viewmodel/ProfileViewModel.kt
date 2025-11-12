@@ -12,6 +12,7 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -39,8 +40,11 @@ class ProfileViewModel : ViewModel() {
                 repo.flowUser(uid)
                     .catch { e -> _error.value = e.message }
                     .collect { userProfile ->
-                        _profile.value = userProfile
-                        Log.d("ProfileVM", "profile=$userProfile")
+                        val finalProfile = userProfile?.copy(
+                            email = auth.currentUser?.email
+                        ) ?: UserProfile(uid = uid, email = auth.currentUser?.email)
+                        _profile.value = finalProfile
+                        Log.d("ProfileVM", "profile=${finalProfile}")
                     }
             }
         }
@@ -87,27 +91,17 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Sube la imagen seleccionada a Firebase Storage y guarda el downloadUrl en Realtime DB.
-     */
     fun onPhotoPicked(uri: Uri) {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             try {
                 _isSaving.value = true
-
-                // Subir a Storage (perfil/{uid}.jpg)
                 val photoRef = storageRef.child("$uid.jpg")
                 photoRef.putFile(uri).await()
                 val downloadUrl = photoRef.downloadUrl.await().toString()
-
-                // Guardar URL en DB
-                val result = repo.updatePhotoUrl(uid, downloadUrl)
-                result.onSuccess {
-                    _message.value = "Foto actualizada"
-                }.onFailure {
-                    _error.value = it.message
-                }
+                repo.updatePhotoUrl(uid, downloadUrl)
+                    .onSuccess { _message.value = "Foto actualizada" }
+                    .onFailure { _error.value = it.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -116,24 +110,14 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Elimina la foto de perfil (borra el campo photoUrl en DB; opcionalmente se podría borrar del Storage).
-     */
     fun onRemovePhoto() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             try {
                 _isSaving.value = true
-
-                // (Opcional) también podrías borrar el archivo de Storage:
-                // runCatching { storageRef.child("$uid.jpg").delete().await() }
-
-                val result = repo.updatePhotoUrl(uid, "")
-                result.onSuccess {
-                    _message.value = "Foto eliminada"
-                }.onFailure {
-                    _error.value = it.message
-                }
+                repo.updatePhotoUrl(uid, "")
+                    .onSuccess { _message.value = "Foto eliminada" }
+                    .onFailure { _error.value = it.message }
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
