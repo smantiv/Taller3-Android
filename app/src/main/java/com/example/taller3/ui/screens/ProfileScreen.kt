@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +63,8 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
 
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -78,8 +81,8 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
 
     LaunchedEffect(profile) {
         profile?.let {
-            name = it.name.toString()
-            phone = it.phone.toString()
+            name = it.name.orEmpty()
+            phone = it.phone.orEmpty()
         }
     }
 
@@ -116,8 +119,7 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
                 // ======= FOTO DE PERFIL (tocar para cambiar) =======
@@ -193,6 +195,37 @@ fun ProfileScreen(onBack: () -> Unit, profileViewModel: ProfileViewModel = viewM
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Quitar foto")
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // ======= CAMBIAR CONTRASEÑA =======
+                Text("Cambiar Contraseña", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Nueva Contraseña") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    enabled = !isSaving
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirmar Contraseña") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    enabled = !isSaving
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { profileViewModel.onChangePassword(password, confirmPassword) },
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cambiar Contraseña")
                 }
             }
 

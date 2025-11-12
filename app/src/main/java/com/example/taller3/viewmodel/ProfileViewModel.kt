@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.taller3.data.UserProfile
 import com.example.taller3.data.repository.ProfileRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +55,33 @@ class ProfileViewModel : ViewModel() {
                 _message.value = "Perfil actualizado"
             }.onFailure {
                 _error.value = it.message
+            }
+            _isSaving.value = false
+        }
+    }
+
+    fun onChangePassword(password: String, confirm: String) {
+        if (password.length < 6) {
+            _error.value = "La contraseña debe tener al menos 6 caracteres."
+            return
+        }
+        if (password != confirm) {
+            _error.value = "Las contraseñas no coinciden."
+            return
+        }
+
+        viewModelScope.launch {
+            _isSaving.value = true
+            val result = repo.changePassword(password)
+            result.onSuccess {
+                _message.value = "Contraseña actualizada"
+            }.onFailure {
+                when (it) {
+                    is FirebaseAuthRecentLoginRequiredException ->
+                        _error.value = "Esta operación es sensible. Vuelve a iniciar sesión."
+                    else ->
+                        _error.value = it.message
+                }
             }
             _isSaving.value = false
         }

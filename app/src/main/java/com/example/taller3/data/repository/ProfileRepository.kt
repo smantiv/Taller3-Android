@@ -2,6 +2,7 @@ package com.example.taller3.data.repository
 
 import android.util.Log
 import com.example.taller3.data.UserProfile
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -15,6 +16,7 @@ class ProfileRepository {
 
     private val db = FirebaseDatabase.getInstance("https://taller3-70cb1-default-rtdb.firebaseio.com")
     private val usersRef = db.getReference("users")
+    private val auth = FirebaseAuth.getInstance()
 
     fun flowUser(uid: String): Flow<UserProfile?> = callbackFlow {
         val userRef = usersRef.child(uid)
@@ -66,6 +68,15 @@ class ProfileRepository {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("ProfileRepo", "updatePhotoUrl failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changePassword(password: String): Result<Unit> {
+        return try {
+            auth.currentUser!!.updatePassword(password).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

@@ -51,6 +51,9 @@ class HomeViewModel : ViewModel() {
             try {
                 Log.d("HomeVM", "setOnline($value)")
                 repo.setOnline(uid, value)
+                    .onSuccess {
+                        _uiState.update { it.copy(isOnline = value) }
+                    }
                     .onFailure { throw it }
             } catch (e: Exception) {
                 Log.e("HomeVM", "setOnline FAIL", e)

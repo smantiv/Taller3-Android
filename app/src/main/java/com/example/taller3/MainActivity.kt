@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -17,6 +18,7 @@ import com.example.taller3.ui.screens.RegisterScreen
 import com.example.taller3.ui.theme.Taller3Theme
 import com.example.taller3.viewmodel.AuthViewModel
 import com.example.taller3.viewmodel.HomeViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
@@ -36,6 +38,20 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(authViewModel: AuthViewModel, homeViewModel: HomeViewModel) {
     val navController = rememberNavController()
     val startDestination = if (authViewModel.getCurrentUser() != null) Screen.Home.route else Screen.Login.route
+
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            if (auth.currentUser == null) {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                }
+            }
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Login.route) {
