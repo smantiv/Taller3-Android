@@ -1,7 +1,9 @@
 package com.example.taller3.viewmodel
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.taller3.data.repository.UserRepository
@@ -17,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
+import android.util.LruCache
 data class UiState(
     val isLoading: Boolean = false,
     val isOnline: Boolean = false,
@@ -112,11 +114,12 @@ class HomeViewModel : ViewModel() {
     }
 
     // 🔹 NUEVO ➤ Convierte una URL en un ícono circular para el marcador
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun getUserMarkerDescriptor(
         context: Context,
         uid: String,
         photoUrl: String?
-    ): BitmapDescriptor? {
+    ): Any? {
         // Si ya está en cache, lo usamos
         iconCache.get(uid)?.let { return it }
 

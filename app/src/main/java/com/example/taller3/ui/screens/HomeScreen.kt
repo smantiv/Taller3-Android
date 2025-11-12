@@ -2,9 +2,11 @@ package com.example.taller3.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,6 +51,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -178,7 +181,7 @@ fun HomeScreen(
                                 context = context,
                                 uid = myUid,
                                 photoUrl = meOnlineEntry?.photoUrl
-                            )
+                            ) as BitmapDescriptor?
                         } else {
                             myIcon = null
                         }
@@ -204,7 +207,7 @@ fun HomeScreen(
                                 context = context,
                                 uid = u.uid,
                                 photoUrl = u.photoUrl
-                            )
+                            ) as BitmapDescriptor?
                         }
                         Marker(
                             state = MarkerState(position = pos),
