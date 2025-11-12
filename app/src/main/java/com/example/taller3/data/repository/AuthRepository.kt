@@ -1,6 +1,6 @@
 package com.example.taller3.data.repository
 
-import com.example.taller3.data.model.UserProfile
+import com.example.taller3.data.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.database.FirebaseDatabase

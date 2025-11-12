@@ -54,4 +54,19 @@ class ProfileRepository {
             Result.failure(e)
         }
     }
+
+    /**
+     * Actualiza la URL de la foto de perfil en la base de datos.
+     * Si 'url' está vacío, elimina la foto (pone cadena vacía).
+     */
+    suspend fun updatePhotoUrl(uid: String, url: String): Result<Unit> {
+        return try {
+            usersRef.child(uid).child("photoUrl").setValue(url).await()
+            Log.d("ProfileRepo", "updated photoUrl")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("ProfileRepo", "updatePhotoUrl failed", e)
+            Result.failure(e)
+        }
+    }
 }
