@@ -1,0 +1,18 @@
+# Gradle / builds
+.gradle/
+**/build/
+local.properties
+.externalNativeBuild/
+.cxx/
+
+# Android Studio
+.idea/
+*.iml
+
+# Misc
+.DS_Store
+*.log
+
+# Keystores (no subir llaves)
+*.jks
+*.keystore
