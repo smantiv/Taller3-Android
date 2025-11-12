@@ -28,7 +28,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,12 +42,12 @@ import com.example.taller3.viewmodel.HomeViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,9 +58,10 @@ fun HomeScreen(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val onlineUsers by homeViewModel.onlineUsers.collectAsStateWithLifecycle()
+
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     val defaultLatLng = LatLng(37.4219999, -122.0840575) // Googleplex
     val cameraPositionState = rememberCameraPositionState {
@@ -69,8 +69,12 @@ fun HomeScreen(
     }
 
     fun hasLocationPermission(): Boolean {
-        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val fine = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
         return fine || coarse
     }
 
@@ -88,10 +92,8 @@ fun HomeScreen(
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
-            scope.launch {
-                snackbarHostState.showSnackbar(it)
-                homeViewModel.clearError()
-            }
+            snackbarHostState.showSnackbar(it)
+            homeViewModel.clearError()
         }
     }
 
@@ -152,19 +154,67 @@ fun HomeScreen(
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+        Box(modifier = Modifier
+            .padding(innerPadding)
+            .fillMaxSize()
+        ) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 properties = MapProperties(isMyLocationEnabled = false)
             ) {
-                uiState.currentLatLng?.let {
+                // ====== 1) Marcador del USUARIO ACTUAL (con foto si está disponible) ======
+                uiState.currentLatLng?.let { myPos ->
+                    val myUid = authViewModel.getCurrentUser()?.uid
+                    // Busca tu entrada (si estás online y el repo la expone)
+                    val meOnlineEntry = onlineUsers.firstOrNull { it.uid == myUid }
+                    var myIcon: BitmapDescriptor? by remember(myUid, meOnlineEntry?.photoUrl) {
+                        mutableStateOf(null)
+                    }
+
+                    LaunchedEffect(myUid, meOnlineEntry?.photoUrl) {
+                        if (myUid != null) {
+                            myIcon = homeViewModel.getUserMarkerDescriptor(
+                                context = context,
+                                uid = myUid,
+                                photoUrl = meOnlineEntry?.photoUrl
+                            )
+                        } else {
+                            myIcon = null
+                        }
+                    }
+
                     Marker(
-                        state = MarkerState(position = it),
-                        title = "Tú"
+                        state = MarkerState(position = myPos),
+                        title = "Tú",
+                        icon = myIcon // si es null, usa default; cuando cargue, se actualiza
                     )
                 }
+
+                // ====== 2) Marcadores de OTROS usuarios online (con su foto) ======
+                val myUid = authViewModel.getCurrentUser()?.uid
+                onlineUsers.forEach { u ->
+                    if (u.uid != null && u.uid != myUid) {
+                        val pos = LatLng(u.lat, u.lng)
+                        var icon: BitmapDescriptor? by remember(u.uid, u.photoUrl) {
+                            mutableStateOf(null)
+                        }
+                        LaunchedEffect(u.uid, u.photoUrl) {
+                            icon = homeViewModel.getUserMarkerDescriptor(
+                                context = context,
+                                uid = u.uid,
+                                photoUrl = u.photoUrl
+                            )
+                        }
+                        Marker(
+                            state = MarkerState(position = pos),
+                            title = u.uid,
+                            icon = icon // cuando cargue, se actualiza al ícono circular
+                        )
+                    }
+                }
             }
+
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
